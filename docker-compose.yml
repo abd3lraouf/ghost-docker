@@ -11,7 +11,6 @@ services:
   ghost:
     image: ghost:alpine
     container_name: deionarra
-    platform: linux/amd64
     restart: always
     environment:
       url: http://localhost
@@ -33,7 +32,6 @@ services:
   db:
     image: mysql:8.0
     container_name: mimir
-    platform: linux/amd64
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: example
@@ -45,7 +43,6 @@ services:
   nginx:
     image: nginx:alpine
     container_name: ${CONTAINER_NGINX:-nginx}
-    platform: linux/amd64
     restart: always
     ports:
       - "80:80"
@@ -61,7 +58,6 @@ services:
   docker-gen:
     image: jwilder/docker-gen
     container_name: ${CONTAINER_DOCKERGEN:-docker-gen}
-    platform: linux/amd64
     restart: always
     command: -notify-sighup nginx -watch -wait 5s:30s /etc/docker-gen/templates/nginx.tmpl /etc/nginx/conf.d/default.conf
     volumes:
@@ -78,7 +74,6 @@ services:
   letsencrypt-companion:
     image: jrcs/letsencrypt-nginx-proxy-companion
     container_name: ${CONTAINER_LETSENCRYPT:-letsencrypt-nginx-proxy-companion}
-    platform: linux/amd64
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
