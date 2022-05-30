@@ -1,0 +1,5 @@
+# Automatic override
+.env
+docker-compose.override.yml
+nginx-data/
+proxy-data/

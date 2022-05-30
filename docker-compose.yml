@@ -1,0 +1,102 @@
+# This Docker compose file is modified from the example given in the
+# official Ghost image by Docker on https://store.docker.com/images/ghost,
+# integrating the work of the following devs:
+#   - Adrian Perez (mariadb and Docker volumes): https://adrianperez.org/advanced-deployment-of-ghost-in-2-minutes-with-docker/
+#   - Docker compose file reference (the Right Way™ to do volumes): https://docs.docker.com/compose/compose-file/#service-configuration-reference
+
+version: '3.1'
+
+services:
+  ## Ghost blog container definition
+  ghost:
+    image: ghost:alpine
+    container_name: deionarra
+    platform: linux/amd64
+    restart: always
+    environment:
+      url: http://localhost
+      database__client: mysql
+      database__connection__host: db
+      database__connection__user: root
+      database__connection__password: example
+      database__connection__database: ghost
+      ## Settings for reverse proxy and Let's Encrypt
+      VIRTUAL_HOST: localhost
+      LETSENCRYPT_HOST: example.com
+      LETSENCRYPT_EMAIL: webmaster@example.com
+    volumes:
+      - legacy:/var/lib/ghost/content
+    networks:
+      - proxy
+      - bridge
+  ## Database container definition
+  db:
+    image: mysql:8.0
+    container_name: mimir
+    platform: linux/amd64
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+    volumes:
+      - mimir:/var/lib/mysql
+    networks:
+      - bridge
+  ## Reverse-proxy container definitions
+  nginx:
+    image: nginx:alpine
+    container_name: ${CONTAINER_NGINX:-nginx}
+    platform: linux/amd64
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${NGINX_FILES_PATH:-./nginx-data}/conf.d:/etc/nginx/conf.d
+      - ${NGINX_FILES_PATH:-./nginx-data}/vhost.d:/etc/nginx/vhost.d
+      - ${NGINX_FILES_PATH:-./nginx-data}/html:/usr/share/nginx/html
+      - ${NGINX_FILES_PATH:-./nginx-data}/certs:/etc/nginx/certs:ro
+      - ${NGINX_FILES_PATH:-./nginx-data}/htpasswd:/etc/nginx/htpasswd:ro
+    networks:
+      - proxy
+  docker-gen:
+    image: jwilder/docker-gen
+    container_name: ${CONTAINER_DOCKERGEN:-docker-gen}
+    platform: linux/amd64
+    restart: always
+    command: -notify-sighup nginx -watch -wait 5s:30s /etc/docker-gen/templates/nginx.tmpl /etc/nginx/conf.d/default.conf
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx.tmpl:/etc/docker-gen/templates/nginx.tmpl:ro
+      - ${NGINX_FILES_PATH:-./nginx-data}/conf.d:/etc/nginx/conf.d
+      - ${NGINX_FILES_PATH:-./nginx-data}/vhost.d:/etc/nginx/vhost.d
+      - ${NGINX_FILES_PATH:-./nginx-data}/html:/usr/share/nginx/html
+      - ${NGINX_FILES_PATH:-./nginx-data}/certs:/etc/nginx/certs:ro
+      - ${NGINX_FILES_PATH:-./nginx-data}/htpasswd:/etc/nginx/htpasswd:ro
+    networks:
+      - proxy
+  ## Let's Encrypt
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: ${CONTAINER_LETSENCRYPT:-letsencrypt-nginx-proxy-companion}
+    platform: linux/amd64
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${NGINX_FILES_PATH:-./nginx-data}/conf.d:/etc/nginx/conf.d
+      - ${NGINX_FILES_PATH:-./nginx-data}/vhost.d:/etc/nginx/vhost.d
+      - ${NGINX_FILES_PATH:-./nginx-data}/html:/usr/share/nginx/html
+      - ${NGINX_FILES_PATH:-./nginx-data}/certs:/etc/nginx/certs:rw
+    environment:
+      NGINX_DOCKER_GEN_CONTAINER: ${CONTAINER_DOCKERGEN:-docker-gen}
+      NGINX_PROXY_CONTAINER: ${CONTAINER_NGINX:-nginx}
+      ACME_CA_URI: ${ACME_CA_URI:-https://acme-staging-v02.api.letsencrypt.org/directory}
+    networks:
+      - proxy
+
+volumes:
+  legacy: ## Ghost data volume declaration
+  mimir: ## Database data volume declaration
+
+networks:
+  bridge: ## Private bridge network declaration
+  proxy: ## Public proxy network declaration
